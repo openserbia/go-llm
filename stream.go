@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 )
 
@@ -40,6 +41,25 @@ const (
 // stream is emulated from a non-streaming response.
 const singleShotBuffer = 2
 
+// isStreamRejection reports whether a failed streaming request is worth
+// retrying as a single non-streaming call.
+//
+// Deliberately broader than IsUnsupportedResponseFormat, which it used to
+// share an implementation with. The single-shot path runs Chat's own degrade
+// chain, so it recovers from a rejected response_format as well as from a
+// backend with no SSE support at all, and guessing wrong costs one request
+// that fails the same way it just did. A 4xx here is worth that one retry; a
+// 5xx is the backend being broken, and repeating it would only multiply the
+// failure.
+func isStreamRejection(err error) bool {
+	switch Status(err) {
+	case http.StatusBadRequest, http.StatusUnprocessableEntity:
+		return true
+	default:
+		return false
+	}
+}
+
 // ChatStream opens a server-sent events stream and delivers token deltas on
 // the returned channel, which closes when the stream ends.
 //
@@ -67,7 +87,7 @@ func (c *HTTPClient) ChatStream(ctx context.Context, req ChatRequest) (<-chan St
 		body := readErrorBody(resp.Body)
 		_ = resp.Body.Close()
 		apiErr := &APIError{Op: "llm: chat-stream", Status: resp.StatusCode, Body: body}
-		if IsUnsupportedResponseFormat(apiErr) {
+		if isStreamRejection(apiErr) {
 			return c.streamViaSingleShot(ctx, req)
 		}
 		return nil, apiErr

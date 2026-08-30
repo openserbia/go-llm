@@ -30,19 +30,42 @@ func Status(err error) int {
 	return 0
 }
 
-// IsUnsupportedResponseFormat reports whether err looks like the backend
-// rejecting the response_format we asked for, rather than rejecting the
-// request as a whole. Backends without a grammar engine answer a
-// json_schema request with 400 or 422 and no machine-readable marker, so
-// status is the only signal available; Chat uses this to decide whether
-// retrying at a weaker structured-output level is worth attempting.
+// IsUnsupportedResponseFormat reports whether err is the backend rejecting the
+// response_format we asked for, rather than rejecting the request as a whole.
+//
+// Status alone is not enough. 400 is the generic "bad request" answer, and a
+// malformed schema, a prompt missing the literal word "json" that json_object
+// mode requires, and a context overflow all arrive as one. Treating those as
+// "this backend has no grammar engine" degrades to free text and hides a
+// problem the caller could have fixed, so the body has to name the format
+// before we believe it.
 func IsUnsupportedResponseFormat(err error) bool {
 	switch Status(err) {
 	case http.StatusBadRequest, http.StatusUnprocessableEntity:
-		return true
 	default:
 		return false
 	}
+	return containsAny(err.Error(), formatRejectionSignatures)
+}
+
+// formatRejectionSignatures are the fragments backends put in the body when
+// the response_format itself is the problem. Lowercase; matching folds case.
+var formatRejectionSignatures = []string{
+	"response_format",
+	"json_schema",
+	"grammar",
+	"guided_",
+	"structured output",
+}
+
+func containsAny(s string, needles []string) bool {
+	s = strings.ToLower(s)
+	for _, needle := range needles {
+		if strings.Contains(s, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 // IsContextOverflow reports whether err is the backend saying the prompt did
@@ -62,17 +85,11 @@ func IsContextOverflow(err error) bool {
 	if err == nil {
 		return false
 	}
-	s := err.Error()
-	for _, needle := range overflowSignatures {
-		if strings.Contains(s, needle) {
-			return true
-		}
-	}
-	return false
+	return containsAny(err.Error(), overflowSignatures)
 }
 
 var overflowSignatures = []string{
-	"Context size has been exceeded",
+	"context size has been exceeded",
 	"context_length_exceeded",
 	"maximum context length",
 	"greater than the context length",
