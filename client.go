@@ -110,7 +110,15 @@ type wireRequest struct {
 	Temperature    float64         `json:"temperature"`
 	MaxTokens      int             `json:"max_tokens,omitzero"`
 	Stream         bool            `json:"stream,omitzero"`
+	StreamOptions  *streamOptions  `json:"stream_options,omitzero"`
 	ResponseFormat *ResponseFormat `json:"response_format,omitzero"`
+}
+
+// streamOptions asks for a final usage-only event. Without it a streaming
+// caller gets no token accounting at all, while the non-streaming path always
+// reports it.
+type streamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
 }
 
 type wireResponse struct {
@@ -129,7 +137,7 @@ func (c *HTTPClient) wire(req ChatRequest, format *ResponseFormat, stream bool) 
 	if model == "" {
 		model = c.opts.Model
 	}
-	return wireRequest{
+	out := wireRequest{
 		Model:          model,
 		Messages:       req.Messages,
 		Temperature:    req.Temperature,
@@ -137,6 +145,10 @@ func (c *HTTPClient) wire(req ChatRequest, format *ResponseFormat, stream bool) 
 		Stream:         stream,
 		ResponseFormat: format,
 	}
+	if stream {
+		out.StreamOptions = &streamOptions{IncludeUsage: true}
+	}
+	return out
 }
 
 // finishReasonLength is what backends report when the token budget, rather

@@ -14,10 +14,17 @@ import (
 // StreamChunk is one piece of a streamed completion. Done marks the end of the
 // stream; Err is non-nil only when the stream terminated abnormally. Exactly
 // one terminal chunk (Done or Err) is delivered before the channel closes.
+//
+// FinishReason and Usage are populated only on the terminal chunk, and only
+// when the backend reported them. A FinishReason of "length" means the token
+// budget ended the completion, which matters most when the caller asked for
+// structured output: a truncated JSON document never parses.
 type StreamChunk struct {
-	Delta string
-	Done  bool
-	Err   error
+	Delta        string
+	Done         bool
+	Err          error
+	FinishReason string
+	Usage        Usage
 }
 
 // Streamer extends Client with token streaming.
@@ -105,11 +112,15 @@ type streamEvent struct {
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
+	Usage *Usage `json:"usage"`
 }
 
 func consume(body io.ReadCloser, ch chan<- StreamChunk) {
 	defer close(ch)
 	defer func() { _ = body.Close() }()
+
+	var terminal StreamChunk
+	terminal.Done = true
 
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, streamLineInitial), streamLineMax)
@@ -120,7 +131,7 @@ func consume(body io.ReadCloser, ch chan<- StreamChunk) {
 		}
 		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		if data == "[DONE]" {
-			ch <- StreamChunk{Done: true}
+			ch <- terminal
 			return
 		}
 
@@ -129,15 +140,19 @@ func consume(body io.ReadCloser, ch chan<- StreamChunk) {
 			ch <- StreamChunk{Err: fmt.Errorf("llm: chat-stream: parse event: %w", err)}
 			return
 		}
+		if event.Usage != nil {
+			terminal.Usage = *event.Usage
+		}
 		if len(event.Choices) == 0 {
 			continue
 		}
 		if delta := event.Choices[0].Delta.Content; delta != "" {
 			ch <- StreamChunk{Delta: delta}
 		}
-		if event.Choices[0].FinishReason != nil {
-			ch <- StreamChunk{Done: true}
-			return
+		// Record the reason but keep reading: with stream_options.include_usage
+		// the usage-only event follows this one, and stopping here would drop it.
+		if reason := event.Choices[0].FinishReason; reason != nil {
+			terminal.FinishReason = *reason
 		}
 	}
 
@@ -146,7 +161,7 @@ func consume(body io.ReadCloser, ch chan<- StreamChunk) {
 		return
 	}
 	// Clean EOF without an explicit terminator still ends the stream.
-	ch <- StreamChunk{Done: true}
+	ch <- terminal
 }
 
 func (c *HTTPClient) streamViaSingleShot(ctx context.Context, req ChatRequest) (<-chan StreamChunk, error) {
@@ -158,7 +173,7 @@ func (c *HTTPClient) streamViaSingleShot(ctx context.Context, req ChatRequest) (
 	if resp.Content != "" {
 		ch <- StreamChunk{Delta: resp.Content}
 	}
-	ch <- StreamChunk{Done: true}
+	ch <- StreamChunk{Done: true, FinishReason: resp.FinishReason, Usage: resp.Usage}
 	close(ch)
 	return ch, nil
 }
