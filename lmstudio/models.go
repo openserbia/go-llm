@@ -17,21 +17,15 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/openserbia/go-llm/internal/httpx"
 )
 
 // DefaultTimeout bounds one native API request when Options.Timeout is zero.
 const DefaultTimeout = 10 * time.Second
-
-// errorBodyLimit caps how much of an error response we quote back.
-const errorBodyLimit = 4096
-
-func successful(status int) bool {
-	return status >= http.StatusOK && status < http.StatusMultipleChoices
-}
 
 // ErrModelNotFound means the server does not know the requested model, whether
 // or not it is downloaded.
@@ -138,19 +132,11 @@ func New(opts Options) (*Client, error) {
 	if opts.BaseURL == "" {
 		return nil, errors.New("lmstudio: BaseURL is required")
 	}
-	httpClient := opts.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{}
-	}
-	timeout := opts.Timeout
-	if timeout <= 0 {
-		timeout = DefaultTimeout
-	}
 	return &Client{
 		root:    ServerRoot(opts.BaseURL),
 		apiKey:  opts.APIKey,
-		timeout: timeout,
-		http:    httpClient,
+		timeout: httpx.Timeout(opts.Timeout, DefaultTimeout),
+		http:    httpx.Client(opts.HTTPClient),
 	}, nil
 }
 
@@ -179,19 +165,16 @@ func (c *Client) Models(ctx context.Context) ([]Model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("lmstudio: build request: %w", err)
 	}
-	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	}
+	httpx.SetAuth(req, c.apiKey)
 
-	resp, err := c.http.Do(req)
+	resp, err := httpx.Do(c.http, req)
 	if err != nil {
 		return nil, fmt.Errorf("lmstudio: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if !successful(resp.StatusCode) {
-		raw, _ := io.ReadAll(io.LimitReader(resp.Body, errorBodyLimit))
-		return nil, fmt.Errorf("lmstudio: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	if !httpx.Successful(resp.StatusCode) {
+		return nil, fmt.Errorf("lmstudio: HTTP %d: %s", resp.StatusCode, httpx.ReadErrorBody(resp.Body))
 	}
 
 	var out modelsResponse
