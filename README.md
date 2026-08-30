@@ -5,9 +5,9 @@ self-hosted backends actually implement.
 
 LM Studio, Ollama, vLLM, llama.cpp and text-generation-inference all claim to
 speak the OpenAI API, and all of them are missing a different part of it. This
-library detects those gaps from the backend's own error responses and degrades
-instead of failing, so the calling code does not have to know which backend it
-is pointed at.
+library detects those gaps — from the backend's error responses, and from the
+bytes a request actually returns — and degrades instead of failing, so the
+calling code does not have to know which backend it is pointed at.
 
 Zero dependencies outside the standard library.
 
@@ -73,6 +73,51 @@ than an error:
 format := llm.JSONSchemaOf("translation", schema)
 format.Required = true // fail instead of degrading
 ```
+
+### Typed responses
+
+`ChatAs` derives the schema from the type, decodes into it, and retries once
+with the decoder's error if the model got it wrong:
+
+```go
+type Answer struct {
+    City       string `json:"city"`
+    Population int    `json:"population"`
+}
+
+got, err := llm.ChatAs[Answer](ctx, client, llm.ChatRequest{
+    Messages: []llm.Message{llm.User("describe Novi Sad")},
+})
+```
+
+The derived schema sets `additionalProperties: false` and lists every property
+in `required`, which strict mode demands and which backends report as an opaque
+400 when you get it wrong by hand. `omitempty` does not make a field optional —
+use a pointer, which becomes a nullable union. The decode rejects unknown
+members too, so a reply carrying a field the schema forbade is the failure that
+spends the one repair retry rather than being silently dropped.
+
+`ChatAs` takes the client as an argument rather than being a method, so it
+composes with `OverflowRetry` and any other wrapper. Types that have no
+portable strict-mode form — maps, `any`, and anything recursive — are refused
+by `SchemaOf` up front; write the schema by hand and pass it through
+`JSONSchemaOf` if you need one.
+
+### When a backend ignores the request
+
+Not every backend that accepts `response_format` honours it. Ollama's
+OpenAI-compatible endpoint takes the field and ignores it, because its
+structured output lives on a separate parameter — the reply is a 200 with
+ordinary prose. `Chat` checks that a structured request produced JSON and
+treats a prose answer the same as an outright rejection, so it degrades rather
+than handing you unconstrained text that looks like a success. Set
+`ResponseFormat.Required` to get a `*llm.FormatIgnoredError` instead.
+
+A separate case does not degrade: a structured reply cut short by the token
+budget comes back with `finish_reason: "length"`, and a truncated document
+under a grammar is never valid JSON. A smaller schema would not buy back the
+budget, so `Chat` returns a `*llm.TruncatedError` telling you to raise
+`MaxTokens` rather than burning two more requests to reach the same failure.
 
 ## Streaming
 

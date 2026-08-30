@@ -13,8 +13,20 @@
 // Structured output is requested through ResponseFormat. JSONSchema asks for
 // grammar-constrained decoding against a schema; JSONObject asks only for
 // "some valid JSON". A backend that rejects either one is detected from its
-// error response and retried at the next weaker level, so the same code path
-// works against a backend with a grammar engine and one without.
+// error response, and a backend that accepts the field and ignores it is
+// detected from the bytes it returns, so the same code path works against a
+// backend with a grammar engine and one without — and, unlike an error-only
+// check, notices the second case at all.
+//
+// ChatAs derives the schema from a Go type and decodes into it:
+//
+//	type Answer struct {
+//		City       string `json:"city"`
+//		Population int    `json:"population"`
+//	}
+//	got, err := llm.ChatAs[Answer](ctx, client, llm.ChatRequest{
+//		Messages: []llm.Message{llm.User("describe Novi Sad")},
+//	})
 //
 // Sibling packages cover the rest of a local inference stack:
 // [github.com/openserbia/go-llm/embed] for embeddings,
