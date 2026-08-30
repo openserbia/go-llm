@@ -1,6 +1,10 @@
 package httpx_test
 
 import (
+	"bytes"
+	"errors"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -156,5 +160,80 @@ func TestBackoffGrowsAndCaps(t *testing.T) {
 	}
 	if got := httpx.Backoff(99, minD, maxD); got != maxD {
 		t.Errorf("Backoff(99) = %v, want %v", got, maxD)
+	}
+}
+
+// flakyTransport fails the first attempt with a dial error and records the
+// body each attempt actually carried.
+type flakyTransport struct {
+	attempts int
+	bodies   []string
+}
+
+func (f *flakyTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	f.attempts++
+	got := ""
+	if r.Body != nil {
+		raw, _ := io.ReadAll(r.Body)
+		got = string(raw)
+	}
+	f.bodies = append(f.bodies, got)
+	if f.attempts == 1 {
+		return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("ok")),
+		Header:     make(http.Header),
+	}, nil
+}
+
+func TestDoRetryResendsTheBody(t *testing.T) {
+	const payload = `{"model":"m"}`
+	transport := &flakyTransport{}
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		"http://example.invalid/v1/chat", bytes.NewReader([]byte(payload)))
+	if err != nil {
+		t.Fatalf("NewRequestWithContext: %v", err)
+	}
+
+	resp, err := httpx.Do(&http.Client{Transport: transport}, req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if transport.attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", transport.attempts)
+	}
+	// The first attempt drains the body and http.Client closes it. Without a
+	// rewind the retry reaches the backend with an empty body, which it would
+	// answer with a confusing 400 rather than an obvious failure.
+	if transport.bodies[1] != payload {
+		t.Errorf("retry sent body %q, want %q", transport.bodies[1], payload)
+	}
+}
+
+func TestDoDoesNotRetryUnrewindableBody(t *testing.T) {
+	transport := &flakyTransport{}
+
+	// A stream with no GetBody: http.NewRequestWithContext cannot supply one
+	// for an arbitrary reader.
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		"http://example.invalid/v1/chat", struct{ io.Reader }{strings.NewReader("x")})
+	if err != nil {
+		t.Fatalf("NewRequestWithContext: %v", err)
+	}
+
+	resp, err := httpx.Do(&http.Client{Transport: transport}, req)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+	if err == nil {
+		t.Fatal("Do succeeded, want the dial error surfaced")
+	}
+	if transport.attempts != 1 {
+		t.Errorf("attempts = %d, want 1 — an unrewindable body must not be retried", transport.attempts)
 	}
 }

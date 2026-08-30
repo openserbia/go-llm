@@ -101,6 +101,9 @@ func Do(c *http.Client, req *http.Request) (*http.Response, error) {
 	var lastErr error
 	for attempt := 0; attempt <= DialRetries; attempt++ {
 		if attempt > 0 {
+			if err := rewind(req); err != nil {
+				return nil, lastErr
+			}
 			select {
 			case <-req.Context().Done():
 				return nil, req.Context().Err()
@@ -117,6 +120,33 @@ func Do(c *http.Client, req *http.Request) (*http.Response, error) {
 		}
 	}
 	return nil, lastErr
+}
+
+// errNoRewind means a request body cannot be replayed, so the request must not
+// be retried.
+var errNoRewind = errors.New("httpx: request body cannot be rewound")
+
+// rewind restores a request body that the previous attempt consumed.
+//
+// The failed attempt drained the body and http.Client closed it, so sending
+// the same request again would transmit an empty one — a silent corruption
+// that only appears on the retry path. http.NewRequestWithContext supplies
+// GetBody for the in-memory readers this module uses; a body without one
+// cannot be replayed safely, and the caller gets the original dial error
+// rather than a request the backend would misread.
+func rewind(req *http.Request) error {
+	if req.Body == nil {
+		return nil
+	}
+	if req.GetBody == nil {
+		return errNoRewind
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return errNoRewind
+	}
+	req.Body = body
+	return nil
 }
 
 // isDialFailure reports whether err is the connection never being established,
