@@ -1,7 +1,7 @@
 package llm_test
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/openserbia/go-llm"

@@ -2,7 +2,7 @@ package llm
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/http"
@@ -47,7 +47,7 @@ func (c *HTTPClient) Models(ctx context.Context) ([]ModelInfo, error) {
 	}
 
 	var out modelsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("llm: models: decode response: %w", err)
 	}
 	return out.Data, nil

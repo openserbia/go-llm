@@ -2,7 +2,7 @@ package embed_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"math"
 	"net/http"
@@ -24,7 +24,7 @@ func vectorServer(t *testing.T, vectors ...[]float32) *httptest.Server {
 		for _, v := range vectors {
 			payload.Data = append(payload.Data, item{Embedding: v})
 		}
-		_ = json.NewEncoder(w).Encode(payload)
+		_ = json.MarshalWrite(w, payload)
 	}))
 	t.Cleanup(srv.Close)
 	return srv
