@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/openserbia/go-llm/internal/httpx"
 )
 
 // StreamChunk is one piece of a streamed completion. Done marks the end of the
@@ -90,8 +92,8 @@ func (c *HTTPClient) ChatStream(ctx context.Context, req ChatRequest) (<-chan St
 		return nil, fmt.Errorf("llm: chat-stream: %w", err)
 	}
 
-	if !successful(resp.StatusCode) {
-		body := readErrorBody(resp.Body)
+	if !httpx.Successful(resp.StatusCode) {
+		body := httpx.ReadErrorBody(resp.Body)
 		_ = resp.Body.Close()
 		apiErr := &APIError{Op: "llm: chat-stream", Status: resp.StatusCode, Body: body}
 		if isStreamRejection(apiErr) {

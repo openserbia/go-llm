@@ -2,8 +2,9 @@ package llm
 
 import (
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/openserbia/go-llm/internal/httpx"
 )
 
 // DefaultTimeout bounds a single non-streaming request when Options.Timeout
@@ -37,22 +38,14 @@ type Options struct {
 }
 
 func (o Options) timeout() time.Duration {
-	if o.Timeout <= 0 {
-		return DefaultTimeout
-	}
-	return o.Timeout
+	return httpx.Timeout(o.Timeout, DefaultTimeout)
 }
 
 func (o Options) httpClient() *http.Client {
-	if o.HTTPClient != nil {
-		return o.HTTPClient
-	}
-	// No client-level Timeout: per-request deadlines come from the context so
-	// that streaming and non-streaming can be bounded differently.
-	return &http.Client{}
+	return httpx.Client(o.HTTPClient)
 }
 
 // endpoint joins the base URL with a path segment such as "/chat/completions".
 func (o Options) endpoint(path string) string {
-	return strings.TrimRight(o.BaseURL, "/") + path
+	return httpx.Join(o.BaseURL, path)
 }

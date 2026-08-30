@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/openserbia/go-llm/internal/httpx"
 )
 
 // ModelInfo is one entry from the OpenAI-compatible GET /models.
@@ -32,18 +34,16 @@ func (c *HTTPClient) Models(ctx context.Context) ([]ModelInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("llm: build models request: %w", err)
 	}
-	if c.opts.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.opts.APIKey)
-	}
+	httpx.SetAuth(req, c.opts.APIKey)
 
-	resp, err := c.http.Do(req)
+	resp, err := httpx.Do(c.http, req)
 	if err != nil {
 		return nil, fmt.Errorf("llm: models: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if !successful(resp.StatusCode) {
-		return nil, &APIError{Op: "llm: models", Status: resp.StatusCode, Body: readErrorBody(resp.Body)}
+	if !httpx.Successful(resp.StatusCode) {
+		return nil, &APIError{Op: "llm: models", Status: resp.StatusCode, Body: httpx.ReadErrorBody(resp.Body)}
 	}
 
 	var out modelsResponse

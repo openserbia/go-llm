@@ -7,8 +7,9 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
+
+	"github.com/openserbia/go-llm/internal/httpx"
 )
 
 // Role is a chat message author.
@@ -238,14 +239,14 @@ func (c *HTTPClient) do(ctx context.Context, body wireRequest) (ChatResponse, er
 		return ChatResponse{}, err
 	}
 
-	httpResp, err := c.http.Do(req)
+	httpResp, err := httpx.Do(c.http, req)
 	if err != nil {
 		return ChatResponse{}, fmt.Errorf("llm: chat: %w", err)
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
-	if !successful(httpResp.StatusCode) {
-		return ChatResponse{}, &APIError{Op: "llm: chat", Status: httpResp.StatusCode, Body: readErrorBody(httpResp.Body)}
+	if !httpx.Successful(httpResp.StatusCode) {
+		return ChatResponse{}, &APIError{Op: "llm: chat", Status: httpResp.StatusCode, Body: httpx.ReadErrorBody(httpResp.Body)}
 	}
 
 	var out wireResponse
@@ -276,26 +277,9 @@ func (c *HTTPClient) buildRequest(ctx context.Context, body wireRequest) (*http.
 		return nil, fmt.Errorf("llm: build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.opts.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.opts.APIKey)
-	}
+	httpx.SetAuth(req, c.opts.APIKey)
 	if body.Stream {
 		req.Header.Set("Accept", "text/event-stream")
 	}
 	return req, nil
-}
-
-// errorBodyLimit caps how much of an error response we read. Enough for any
-// real diagnostic, bounded against a backend that answers an error with a
-// megabyte of HTML.
-const errorBodyLimit = 4096
-
-// successful reports whether status is 2xx.
-func successful(status int) bool {
-	return status >= http.StatusOK && status < http.StatusMultipleChoices
-}
-
-func readErrorBody(r io.Reader) string {
-	raw, _ := io.ReadAll(io.LimitReader(r, errorBodyLimit))
-	return string(raw)
 }
