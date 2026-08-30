@@ -28,6 +28,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/openserbia/go-llm/internal/httpx"
 )
 
 // Result is one (document index, score) pair. Index refers back into the
@@ -83,13 +85,6 @@ type Options struct {
 // DefaultTimeout bounds one rerank request when Options.Timeout is zero.
 const DefaultTimeout = 30 * time.Second
 
-// errorBodyLimit caps how much of an error response we quote back.
-const errorBodyLimit = 4096
-
-func successful(status int) bool {
-	return status >= http.StatusOK && status < http.StatusMultipleChoices
-}
-
 // HealthProbeTimeout caps a single /health request, so a hung backend cannot
 // stall the WaitUntilReady loop. The overall budget for "wait for the model to
 // load" belongs on the context passed to WaitUntilReady.
@@ -108,11 +103,7 @@ func New(opts Options) (*HTTPClient, error) {
 	if opts.BaseURL == "" {
 		return nil, errors.New("rerank: BaseURL is required")
 	}
-	httpClient := opts.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{}
-	}
-	return &HTTPClient{opts: opts, http: httpClient}, nil
+	return &HTTPClient{opts: opts, http: httpx.Client(opts.HTTPClient)}, nil
 }
 
 type wireRequest struct {
@@ -130,10 +121,7 @@ func (c *HTTPClient) Rerank(ctx context.Context, query string, documents []strin
 		return nil, nil
 	}
 
-	timeout := c.opts.Timeout
-	if timeout <= 0 {
-		timeout = DefaultTimeout
-	}
+	timeout := httpx.Timeout(c.opts.Timeout, DefaultTimeout)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -148,22 +136,21 @@ func (c *HTTPClient) Rerank(ctx context.Context, query string, documents []strin
 		return nil, fmt.Errorf("rerank: encode request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/rerank"), bytes.NewReader(buf))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, httpx.Join(c.opts.BaseURL, "/rerank"), bytes.NewReader(buf))
 	if err != nil {
 		return nil, fmt.Errorf("rerank: build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	c.authorize(req)
+	httpx.SetAuth(req, c.opts.APIKey)
 
-	resp, err := c.http.Do(req)
+	resp, err := httpx.Do(c.http, req)
 	if err != nil {
 		return nil, fmt.Errorf("rerank: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if !successful(resp.StatusCode) {
-		raw, _ := io.ReadAll(io.LimitReader(resp.Body, errorBodyLimit))
-		return nil, fmt.Errorf("rerank: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	if !httpx.Successful(resp.StatusCode) {
+		return nil, fmt.Errorf("rerank: HTTP %d: %s", resp.StatusCode, httpx.ReadErrorBody(resp.Body))
 	}
 
 	var out []Result
@@ -183,19 +170,19 @@ func (c *HTTPClient) HealthCheck(ctx context.Context) (*HealthInfo, error) {
 	probeCtx, cancel := context.WithTimeout(ctx, HealthProbeTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(probeCtx, http.MethodGet, c.url("/health"), http.NoBody)
+	req, err := http.NewRequestWithContext(probeCtx, http.MethodGet, httpx.Join(c.opts.BaseURL, "/health"), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("rerank: build health request: %w", err)
 	}
-	c.authorize(req)
+	httpx.SetAuth(req, c.opts.APIKey)
 
-	resp, err := c.http.Do(req)
+	resp, err := httpx.Do(c.http, req)
 	if err != nil {
 		return nil, RetryableError{Err: fmt.Errorf("rerank: health: %w", err)}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, errorBodyLimit))
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, httpx.ErrorBodyLimit))
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -211,21 +198,10 @@ func (c *HTTPClient) HealthCheck(ctx context.Context) (*HealthInfo, error) {
 	}
 }
 
-func (c *HTTPClient) url(path string) string {
-	return strings.TrimRight(c.opts.BaseURL, "/") + path
-}
-
-func (c *HTTPClient) authorize(req *http.Request) {
-	if c.opts.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.opts.APIKey)
-	}
-}
-
 // Backoff bounds for WaitUntilReady.
 const (
-	minBackoff    = time.Second
-	maxBackoff    = 10 * time.Second
-	backoffFactor = 2
+	minBackoff = time.Second
+	maxBackoff = 10 * time.Second
 )
 
 // WaitUntilReady polls HealthCheck until the backend is ready, ctx expires, or
@@ -236,7 +212,7 @@ const (
 // ctx must carry a deadline. Without one, a backend stuck at 503 will be
 // polled forever.
 func WaitUntilReady(ctx context.Context, c Client, logger *slog.Logger) (*HealthInfo, error) {
-	backoff := minBackoff
+	attempt := 0
 	for {
 		info, err := c.HealthCheck(ctx)
 		if err == nil {
@@ -247,6 +223,8 @@ func WaitUntilReady(ctx context.Context, c Client, logger *slog.Logger) (*Health
 		if !errors.As(err, &retryable) {
 			return nil, err
 		}
+
+		backoff := httpx.Backoff(attempt, minBackoff, maxBackoff)
 
 		logger.Info("rerank: backend not ready, waiting",
 			slog.String("err", err.Error()),
@@ -259,6 +237,6 @@ func WaitUntilReady(ctx context.Context, c Client, logger *slog.Logger) (*Health
 		case <-time.After(backoff):
 		}
 
-		backoff = min(backoff*backoffFactor, maxBackoff)
+		attempt++
 	}
 }
