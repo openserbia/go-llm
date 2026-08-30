@@ -47,14 +47,13 @@ func TestChatStreamCollectsDeltas(t *testing.T) {
 }
 
 func TestChatStreamStopsOnFinishReason(t *testing.T) {
-	// The reader no longer stops at finish_reason — with
-	// stream_options.include_usage the usage event follows it — so the fixture
-	// sends [DONE] after the finish_reason event to terminate the stream.
-	// The trailing delta proves nothing after the terminator is delivered.
+	// The reader keeps scanning past finish_reason so it can pick up the usage
+	// event that include_usage appends after it, but the completion is over at
+	// that point: a delta arriving later is dropped rather than appended to
+	// text the caller has already been told is finished.
 	srv := sseServer(t,
 		delta("one"),
 		`data: {"choices":[{"delta":{"content":"two"},"finish_reason":"stop"}]}`,
-		"data: [DONE]",
 		delta("never delivered"),
 	)
 

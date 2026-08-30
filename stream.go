@@ -121,6 +121,10 @@ func consume(body io.ReadCloser, ch chan<- StreamChunk) {
 
 	var terminal StreamChunk
 	terminal.Done = true
+	// finished records that the backend has said why it stopped. Reading
+	// continues past that point to collect the usage event, but the completion
+	// itself is over.
+	finished := false
 
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, streamLineInitial), streamLineMax)
@@ -146,13 +150,18 @@ func consume(body io.ReadCloser, ch chan<- StreamChunk) {
 		if len(event.Choices) == 0 {
 			continue
 		}
-		if delta := event.Choices[0].Delta.Content; delta != "" {
+		// Content after a finish_reason is a backend talking past its own
+		// terminator, and forwarding it would append text to a completion the
+		// caller has already been told is over.
+		if delta := event.Choices[0].Delta.Content; delta != "" && !finished {
 			ch <- StreamChunk{Delta: delta}
 		}
-		// Record the reason but keep reading: with stream_options.include_usage
-		// the usage-only event follows this one, and stopping here would drop it.
+		// Record the reason but keep reading rather than returning here: with
+		// stream_options.include_usage the usage-only event arrives after this
+		// one, so stopping now would discard the token accounting.
 		if reason := event.Choices[0].FinishReason; reason != nil {
 			terminal.FinishReason = *reason
+			finished = true
 		}
 	}
 
