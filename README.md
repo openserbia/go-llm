@@ -33,6 +33,15 @@ resp, err := client.Chat(ctx, llm.ChatRequest{
 fmt.Println(resp.Content, resp.Usage.TotalTokens)
 ```
 
+`EnsureModel` fails at startup, naming what the backend does serve, rather than
+letting a typo surface as a confusing first request:
+
+```go
+if err := client.EnsureModel(ctx, ""); err != nil {
+    return err // llm: model "gemma-3-12b" is not available at ... (available: gemma-3-12b-it, bge-m3)
+}
+```
+
 ## Structured output
 
 `JSONSchemaOf` asks for grammar-constrained decoding: the backend's sampler is
