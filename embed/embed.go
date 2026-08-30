@@ -7,22 +7,15 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/openserbia/go-llm/internal/httpx"
 )
 
 // DefaultTimeout bounds one embedding request when Options.Timeout is zero.
 const DefaultTimeout = time.Minute
-
-// errorBodyLimit caps how much of an error response we quote back.
-const errorBodyLimit = 4096
-
-func successful(status int) bool {
-	return status >= http.StatusOK && status < http.StatusMultipleChoices
-}
 
 // Options configures a Client.
 type Options struct {
@@ -87,11 +80,7 @@ func New(opts Options) (*HTTPClient, error) {
 	if opts.BaseURL == "" {
 		return nil, errors.New("embed: BaseURL is required")
 	}
-	httpClient := opts.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{}
-	}
-	return &HTTPClient{opts: opts, http: httpClient}, nil
+	return &HTTPClient{opts: opts, http: httpx.Client(opts.HTTPClient)}, nil
 }
 
 type wireRequest struct {
@@ -116,10 +105,7 @@ func (c *HTTPClient) Embed(ctx context.Context, inputs []string) ([][]float32, e
 		return nil, nil
 	}
 
-	timeout := c.opts.Timeout
-	if timeout <= 0 {
-		timeout = DefaultTimeout
-	}
+	timeout := httpx.Timeout(c.opts.Timeout, DefaultTimeout)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -128,25 +114,22 @@ func (c *HTTPClient) Embed(ctx context.Context, inputs []string) ([][]float32, e
 		return nil, fmt.Errorf("embed: encode request: %w", err)
 	}
 
-	url := strings.TrimRight(c.opts.BaseURL, "/") + "/embeddings"
+	url := httpx.Join(c.opts.BaseURL, "/embeddings")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("embed: build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.opts.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.opts.APIKey)
-	}
+	httpx.SetAuth(req, c.opts.APIKey)
 
-	resp, err := c.http.Do(req)
+	resp, err := httpx.Do(c.http, req)
 	if err != nil {
 		return nil, fmt.Errorf("embed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if !successful(resp.StatusCode) {
-		raw, _ := io.ReadAll(io.LimitReader(resp.Body, errorBodyLimit))
-		return nil, fmt.Errorf("embed: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	if !httpx.Successful(resp.StatusCode) {
+		return nil, fmt.Errorf("embed: HTTP %d: %s", resp.StatusCode, httpx.ReadErrorBody(resp.Body))
 	}
 
 	var out wireResponse
