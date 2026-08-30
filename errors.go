@@ -97,3 +97,49 @@ var overflowSignatures = []string{
 	"prompt is too long",
 	"prompt_too_long",
 }
+
+// FormatIgnoredError reports that the backend accepted a response_format
+// request and then did not honour it.
+//
+// This is the failure an HTTP status cannot show. Ollama's OpenAI-compatible
+// endpoint, for one, does not reject response_format — its structured output
+// lives on a separate parameter, so the field is ignored and the reply comes
+// back 200 with ordinary prose. Only the returned bytes distinguish that from
+// a backend that did constrain its sampler.
+type FormatIgnoredError struct {
+	// Format is the response_format type that was sent.
+	Format string
+	// Content is the offending reply, truncated for the message.
+	Content string
+}
+
+// Error implements error.
+func (e *FormatIgnoredError) Error() string {
+	return fmt.Sprintf("llm: chat: backend accepted response_format %q and returned content that is not JSON: %s",
+		e.Format, e.Content)
+}
+
+// TruncatedError reports that the completion hit its token budget.
+//
+// It matters more for structured output than for prose: under a grammar the
+// decoder cannot emit a partial-but-valid document, so a truncated structured
+// response is unparseable by construction. Reporting the token budget is more
+// useful than reporting the malformed JSON it causes.
+type TruncatedError struct {
+	FinishReason string
+}
+
+// Error implements error.
+func (e *TruncatedError) Error() string {
+	return fmt.Sprintf("llm: chat: response truncated (finish_reason %q); a structured response cut short is never valid JSON, raise MaxTokens",
+		e.FinishReason)
+}
+
+// shouldDegrade reports whether err means "try a weaker structured-output
+// level". A rejected format and an ignored format both do; a truncated
+// response does not, because a weaker constraint does not buy back a token
+// budget.
+func shouldDegrade(err error) bool {
+	var ignored *FormatIgnoredError
+	return IsUnsupportedResponseFormat(err) || errors.As(err, &ignored)
+}

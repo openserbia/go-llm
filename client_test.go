@@ -277,3 +277,98 @@ func TestCompleteSendsSystemAndUser(t *testing.T) {
 		t.Errorf("roles = %v, want %v", roles, want)
 	}
 }
+
+func TestChatDegradesWhenBackendIgnoresFormat(t *testing.T) {
+	rec := &capture{}
+	// The Ollama shape: response_format is not rejected, it is ignored. Every
+	// level answers 200 with prose, so only the returned bytes reveal it.
+	srv := newServer(t, rec, func(_ int, w http.ResponseWriter) { okResponse(w, "Sure! Here is the answer.") })
+
+	resp, err := newClient(t, srv.URL).Chat(context.Background(), llm.ChatRequest{
+		Messages:       []llm.Message{llm.User("hi")},
+		ResponseFormat: llm.JSONSchemaOf("answer", map[string]any{"type": "object"}),
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if len(rec.formats) != 3 {
+		t.Fatalf("attempts = %d, want 3 — non-JSON content must degrade like a rejection", len(rec.formats))
+	}
+	if rec.formats[2] != nil {
+		t.Errorf("attempt 3 format = %+v, want none", rec.formats[2])
+	}
+	// The last level asked for nothing, so prose is the correct answer there.
+	if resp.Content != "Sure! Here is the answer." {
+		t.Errorf("Content = %q", resp.Content)
+	}
+}
+
+func TestChatRequiredSurfacesIgnoredFormat(t *testing.T) {
+	rec := &capture{}
+	srv := newServer(t, rec, func(_ int, w http.ResponseWriter) { okResponse(w, "not json at all") })
+
+	format := llm.JSONSchemaOf("answer", map[string]any{"type": "object"})
+	format.Required = true
+
+	_, err := newClient(t, srv.URL).Chat(context.Background(), llm.ChatRequest{
+		Messages:       []llm.Message{llm.User("hi")},
+		ResponseFormat: format,
+	})
+	if err == nil {
+		t.Fatal("Chat succeeded, want error")
+	}
+	var ignored *llm.FormatIgnoredError
+	if !errors.As(err, &ignored) {
+		t.Fatalf("err = %v, want *llm.FormatIgnoredError", err)
+	}
+	if ignored.Format != llm.FormatJSONSchema {
+		t.Errorf("Format = %q, want %q", ignored.Format, llm.FormatJSONSchema)
+	}
+	if len(rec.formats) != 1 {
+		t.Errorf("attempts = %d, want 1", len(rec.formats))
+	}
+}
+
+func TestChatTruncatedStructuredResponseDoesNotDegrade(t *testing.T) {
+	rec := &capture{}
+	srv := newServer(t, rec, func(_ int, w http.ResponseWriter) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"{\"name\":\"par"},` +
+			`"finish_reason":"length"}]}`))
+	})
+
+	_, err := newClient(t, srv.URL).Chat(context.Background(), llm.ChatRequest{
+		Messages:       []llm.Message{llm.User("hi")},
+		ResponseFormat: llm.JSONObject(),
+	})
+	if err == nil {
+		t.Fatal("Chat succeeded, want error")
+	}
+	var truncated *llm.TruncatedError
+	if !errors.As(err, &truncated) {
+		t.Fatalf("err = %v, want *llm.TruncatedError", err)
+	}
+	// A smaller constraint does not buy back a token budget, so degrading
+	// would burn a request to reach the same failure.
+	if len(rec.formats) != 1 {
+		t.Errorf("attempts = %d, want 1", len(rec.formats))
+	}
+}
+
+func TestChatFreeTextIsNotVerified(t *testing.T) {
+	rec := &capture{}
+	srv := newServer(t, rec, func(_ int, w http.ResponseWriter) { okResponse(w, "just prose") })
+
+	resp, err := newClient(t, srv.URL).Chat(context.Background(), llm.ChatRequest{
+		Messages: []llm.Message{llm.User("hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if resp.Content != "just prose" {
+		t.Errorf("Content = %q", resp.Content)
+	}
+	if len(rec.formats) != 1 {
+		t.Errorf("attempts = %d, want 1", len(rec.formats))
+	}
+}

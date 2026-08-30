@@ -3,6 +3,7 @@ package llm
 import (
 	"bytes"
 	"context"
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
@@ -138,12 +139,49 @@ func (c *HTTPClient) wire(req ChatRequest, format *ResponseFormat, stream bool) 
 	}
 }
 
+// finishReasonLength is what backends report when the token budget, rather
+// than the model, ended the completion.
+const finishReasonLength = "length"
+
+// contentPreviewLimit caps how much unexpected content an error quotes back.
+const contentPreviewLimit = 256
+
+// verify checks that a successful response honoured the format that was
+// actually sent. A nil format asked for nothing, so there is nothing to check.
+func verify(resp ChatResponse, format *ResponseFormat) error {
+	if format == nil {
+		return nil
+	}
+	if resp.FinishReason == finishReasonLength {
+		return &TruncatedError{FinishReason: resp.FinishReason}
+	}
+	// Deliberately strict: a fenced code block is valid prose and invalid
+	// JSON, and it is exactly what a backend produces when it ignored the
+	// grammar and merely read the prompt.
+	if !jsontext.Value(resp.Content).IsValid() {
+		return &FormatIgnoredError{Format: format.Type, Content: preview(resp.Content)}
+	}
+	return nil
+}
+
+func preview(s string) string {
+	r := []rune(s)
+	if len(r) <= contentPreviewLimit {
+		return s
+	}
+	return string(r[:contentPreviewLimit]) + "…"
+}
+
 // Chat sends a chat completion request.
 //
-// When ResponseFormat asks for something the backend does not implement, Chat
+// When ResponseFormat asks for something the backend does not deliver, Chat
 // retries at successively weaker levels — a strict schema falls back to plain
-// JSON object mode, which falls back to unconstrained text. Callers that must
-// have real schema enforcement should set ResponseFormat.Required.
+// JSON object mode, which falls back to unconstrained text. "Does not deliver"
+// covers both an explicit rejection and a backend that accepts the field and
+// ignores it, since the second is only visible in the returned bytes.
+//
+// Callers that must have real schema enforcement should set
+// ResponseFormat.Required, which turns any of those into an error.
 func (c *HTTPClient) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	if len(req.Messages) == 0 {
 		return ChatResponse{}, errors.New("llm: chat: no messages")
@@ -156,10 +194,12 @@ func (c *HTTPClient) Chat(ctx context.Context, req ChatRequest) (ChatResponse, e
 	for _, format := range req.ResponseFormat.degradeChain() {
 		resp, err := c.do(ctx, c.wire(req, format, false))
 		if err == nil {
-			return resp, nil
+			if err = verify(resp, format); err == nil {
+				return resp, nil
+			}
 		}
 		lastErr = err
-		if !IsUnsupportedResponseFormat(err) {
+		if !shouldDegrade(err) {
 			return ChatResponse{}, err
 		}
 	}
