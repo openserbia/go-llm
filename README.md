@@ -144,8 +144,10 @@ tools := model.Capabilities.ToolUse
 VRAM that another workload may be using. Two ways to opt in:
 
 - `UseCLI` shells out to `lms load`. Works only against a local daemon.
-- `WarmUp` sends a one-token completion, which makes LM Studio load the model on
-  demand. Works remotely and inside containers, and costs one throwaway request.
+- `WarmUp` sends a minimal inference request, which makes LM Studio load the
+  model on demand. Works remotely and inside containers, and costs one throwaway
+  request. It matches the endpoint to the model type reported by the native API,
+  so it is safe to use on embedding models.
 
 The same `BaseURL` you use for inference works here; a trailing `/v1` is stripped.
 

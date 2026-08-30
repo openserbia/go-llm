@@ -252,3 +252,48 @@ func TestEnsureLoadedRequiresModel(t *testing.T) {
 		t.Fatal("EnsureLoaded succeeded without a model, want error")
 	}
 }
+
+func TestEnsureLoadedWarmsUpEmbeddingModelViaEmbeddings(t *testing.T) {
+	var (
+		warmed       atomic.Bool
+		chatAttempts atomic.Int32
+	)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/models", func(w http.ResponseWriter, _ *http.Request) {
+		instances := `[]`
+		if warmed.Load() {
+			instances = `[{"config": {"context_length": 8192}}]`
+		}
+		_, _ = w.Write([]byte(`{"models":[{"key":"bge-m3","type":"embedding","max_context_length":8192,` +
+			`"loaded_instances":` + instances + `}]}`))
+	})
+	mux.HandleFunc("/v1/embeddings", func(w http.ResponseWriter, _ *http.Request) {
+		warmed.Store(true)
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[0.1,0.2]}]}`))
+	})
+	mux.HandleFunc("/v1/chat/completions", func(w http.ResponseWriter, _ *http.Request) {
+		// An embedding model has no chat endpoint; reaching this would be the
+		// warm-up asking the wrong question.
+		chatAttempts.Add(1)
+		w.WriteHeader(http.StatusBadRequest)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	model, err := lmstudio.EnsureLoaded(context.Background(), lmstudio.PreflightOptions{
+		Options: lmstudio.Options{BaseURL: srv.URL + "/v1"},
+		Model:   "bge-m3",
+		WarmUp:  true,
+		Logger:  discardLogger(),
+	})
+	if err != nil {
+		t.Fatalf("EnsureLoaded: %v", err)
+	}
+	if got := chatAttempts.Load(); got != 0 {
+		t.Errorf("chat endpoint hit %d times for an embedding model, want 0", got)
+	}
+	if model.ContextLength() != 8192 {
+		t.Errorf("ContextLength = %d, want 8192", model.ContextLength())
+	}
+}

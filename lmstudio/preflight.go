@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/openserbia/go-llm"
+	"github.com/openserbia/go-llm/embed"
 )
 
 // PreflightOptions configures EnsureLoaded.
@@ -32,10 +33,11 @@ type PreflightOptions struct {
 	// useless against a remote server, since the CLI drives the local daemon.
 	UseCLI bool
 
-	// WarmUp allows triggering a load by sending a minimal chat request, which
-	// makes LM Studio load the model on demand. This works where UseCLI does
-	// not — a remote server, or a container without the CLI — at the cost of
-	// one throwaway completion.
+	// WarmUp allows triggering a load by sending a minimal inference request,
+	// which makes LM Studio load the model on demand. This works where UseCLI
+	// does not — a remote server, or a container without the CLI — at the cost
+	// of one throwaway request. The request matches the model type reported by
+	// the native API, so it is safe for embedding models too.
 	WarmUp bool
 }
 
@@ -80,7 +82,7 @@ func EnsureLoaded(ctx context.Context, opts PreflightOptions) (Model, error) {
 	log := opts.logger()
 	log.Info("lmstudio: model is not loaded", slog.String("model", opts.Model))
 
-	if err := load(ctx, opts, log); err != nil {
+	if err := load(ctx, opts, model, log); err != nil {
 		return Model{}, err
 	}
 
@@ -99,14 +101,17 @@ func EnsureLoaded(ctx context.Context, opts PreflightOptions) (Model, error) {
 }
 
 // load runs whichever load strategy the caller enabled.
-func load(ctx context.Context, opts PreflightOptions, log *slog.Logger) error {
+func load(ctx context.Context, opts PreflightOptions, model Model, log *slog.Logger) error {
 	if opts.UseCLI && cliAvailable() {
 		log.Info("lmstudio: loading via lms CLI", slog.String("model", opts.Model))
 		return cliLoad(ctx, opts.Model)
 	}
 	if opts.WarmUp {
-		log.Info("lmstudio: loading via warm-up request", slog.String("model", opts.Model))
-		return warmUp(ctx, opts)
+		log.Info("lmstudio: loading via warm-up request",
+			slog.String("model", opts.Model),
+			slog.String("type", model.Type),
+		)
+		return warmUp(ctx, opts, model)
 	}
 	return fmt.Errorf(
 		"lmstudio: model %q is not loaded; load it in LM Studio, or enable UseCLI or WarmUp",
@@ -134,23 +139,35 @@ func notFoundError(ctx context.Context, opts PreflightOptions) error {
 	return fmt.Errorf("lmstudio: model %q is downloaded but the server does not list it", opts.Model)
 }
 
-// warmUp sends the smallest possible completion. LM Studio loads a model on
-// its first inference request, so the response is discarded — only the side
+// warmUp sends the smallest possible inference request. LM Studio loads a
+// model on its first request, so the response is discarded — only the side
 // effect matters.
-func warmUp(ctx context.Context, opts PreflightOptions) error {
-	client, err := llm.New(llm.Options{
-		BaseURL: strings.TrimRight(ServerRoot(opts.BaseURL), "/") + "/v1",
-		APIKey:  opts.APIKey,
-		Model:   opts.Model,
-	})
+//
+// The request has to match the model: sending a chat completion to an
+// embedding model is an error, not a load, so the model type reported by the
+// native API decides which endpoint to poke.
+func warmUp(ctx context.Context, opts PreflightOptions, model Model) error {
+	baseURL := strings.TrimRight(ServerRoot(opts.BaseURL), "/") + "/v1"
+
+	if model.Type == TypeEmbedding {
+		client, err := embed.New(embed.Options{BaseURL: baseURL, APIKey: opts.APIKey, Model: opts.Model})
+		if err != nil {
+			return err
+		}
+		if _, err := client.Embed(ctx, []string{"warm up"}); err != nil {
+			return fmt.Errorf("lmstudio: warm-up embedding request failed: %w", err)
+		}
+		return nil
+	}
+
+	client, err := llm.New(llm.Options{BaseURL: baseURL, APIKey: opts.APIKey, Model: opts.Model})
 	if err != nil {
 		return err
 	}
-	_, err = client.Chat(ctx, llm.ChatRequest{
+	if _, err := client.Chat(ctx, llm.ChatRequest{
 		Messages:  []llm.Message{llm.User("hi")},
 		MaxTokens: 1,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("lmstudio: warm-up request failed: %w", err)
 	}
 	return nil
