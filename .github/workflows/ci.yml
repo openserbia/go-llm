@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Install Devbox
+        uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7  # v0.15.0
+
+      # `task lint` also runs `go vet -stdversion`, which fails when the code
+      # uses standard library symbols newer than go.mod's go directive.
+      - name: Lint
+        run: devbox run -- task lint
+
+      - name: Test
+        run: devbox run -- task test
+
+      # Reachability-filtered CVE gate. For a zero-dependency module this
+      # watches the standard library, which every consumer inherits.
+      - name: Vulnerability scan
+        run: devbox run -- task deps

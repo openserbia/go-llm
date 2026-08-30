@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.6/.schema/devbox.schema.json",
+  "packages": {
+    "github:openserbia/go-flake#go_1_27_0": "",
+    "github:openserbia/go-flake#golangci-lint_2_13_1": "",
+    "github:openserbia/go-flake#govulncheck_1_7_0": "",
+    "go-task": "latest",
+    "gopls": "latest",
+    "delve": "latest",
+    "gitleaks": "latest",
+    "gcc": "latest",
+    "gh": "latest"
+  },
+  "env": {
+    "LD_LIBRARY_PATH": "",
+    "GOPROXY": "https://proxy.golang.org,direct"
+  },
+  "shell": {
+    "init_hook": [
+      "export \"GOROOT=$(go env GOROOT)\""
+    ],
+    "scripts": {}
+  }
+}

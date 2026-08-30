@@ -1,0 +1,286 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "delve@latest": {
+      "last_modified": "2026-08-27T07:16:00Z",
+      "resolved": "github:NixOS/nixpkgs/c27cdad491a991b11ed731760aa2ef8db0cb0410#delve",
+      "source": "devbox-search",
+      "version": "1.27.1",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/268n69gq7ljwfgf87nry9bqrwynir2yw-delve-1.27.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/268n69gq7ljwfgf87nry9bqrwynir2yw-delve-1.27.1"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/s0mk34slf6irk22mvlirks9b24yvz9iw-delve-1.27.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/s0mk34slf6irk22mvlirks9b24yvz9iw-delve-1.27.1"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/zw67nwk8kbzwj7ml5li0d0095apbx869-delve-1.27.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/zw67nwk8kbzwj7ml5li0d0095apbx869-delve-1.27.1"
+        }
+      }
+    },
+    "gcc@latest": {
+      "last_modified": "2026-08-27T07:16:00Z",
+      "resolved": "github:NixOS/nixpkgs/c27cdad491a991b11ed731760aa2ef8db0cb0410#gcc16",
+      "source": "devbox-search",
+      "version": "16.2.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/z3zd0lklg2b8705zmx11cq35crddbpj4-gcc-wrapper-16.2.0",
+              "default": true
+            },
+            {
+              "name": "man",
+              "path": "/nix/store/pbj8r9p89ilvfklxrj3fyvqdadac0861-gcc-wrapper-16.2.0-man",
+              "default": true
+            },
+            {
+              "name": "info",
+              "path": "/nix/store/g210v8iyk80zy476vp9d7nkgvv5s3i1r-gcc-wrapper-16.2.0-info"
+            }
+          ],
+          "store_path": "/nix/store/z3zd0lklg2b8705zmx11cq35crddbpj4-gcc-wrapper-16.2.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/d0a9bdlmsac38hi0kscqcnh2pn4439ss-gcc-wrapper-16.2.0",
+              "default": true
+            },
+            {
+              "name": "man",
+              "path": "/nix/store/pyn8mm9fribahydk1bxby0c56r3qmfmb-gcc-wrapper-16.2.0-man",
+              "default": true
+            },
+            {
+              "name": "info",
+              "path": "/nix/store/7vfckbslv452rdwwcqa5r5i4rq47m3rj-gcc-wrapper-16.2.0-info"
+            }
+          ],
+          "store_path": "/nix/store/d0a9bdlmsac38hi0kscqcnh2pn4439ss-gcc-wrapper-16.2.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/8pfs1i59j9zxy2c7h0wmb8vcda75pjxv-gcc-wrapper-16.2.0",
+              "default": true
+            },
+            {
+              "name": "man",
+              "path": "/nix/store/pmnqpcv27gdk4nf3py76fcr2g42f2ybb-gcc-wrapper-16.2.0-man",
+              "default": true
+            },
+            {
+              "name": "info",
+              "path": "/nix/store/nh1dnj05p8lygbd8hkvj07r1h5vvbbqf-gcc-wrapper-16.2.0-info"
+            }
+          ],
+          "store_path": "/nix/store/8pfs1i59j9zxy2c7h0wmb8vcda75pjxv-gcc-wrapper-16.2.0"
+        }
+      }
+    },
+    "gh@latest": {
+      "last_modified": "2026-08-27T07:16:00Z",
+      "resolved": "github:NixOS/nixpkgs/c27cdad491a991b11ed731760aa2ef8db0cb0410#gh",
+      "source": "devbox-search",
+      "version": "2.98.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/y81ibbw74n6mskwsh54hnvwblkw33yzb-gh-2.98.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/y81ibbw74n6mskwsh54hnvwblkw33yzb-gh-2.98.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/j5mb4f9a0vbi5r89i00f548z0y5j1kp7-gh-2.98.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/j5mb4f9a0vbi5r89i00f548z0y5j1kp7-gh-2.98.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/dpiajg8vgzpaq74jc79j01fd5bja3cik-gh-2.98.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/dpiajg8vgzpaq74jc79j01fd5bja3cik-gh-2.98.0"
+        }
+      }
+    },
+    "github:NixOS/nixpkgs/nixpkgs-unstable": {
+      "last_modified": "2026-08-19T20:44:59Z",
+      "resolved": "github:NixOS/nixpkgs/07e1d92cdc0ed416cfa11ff3ca40d17e61cfba7a?lastModified=1787172299&narHash=sha256-PShzS87awOlE5XWkxUGBd%2F58%2FF%2BAtE2ZMgFffKj4r8s%3D"
+    },
+    "github:openserbia/go-flake#go_1_27_0": {
+      "last_modified": "2026-08-28T18:15:55Z",
+      "resolved": "github:openserbia/go-flake/cb7821f983ffb6f49f35a013052724d52dadd6da?lastModified=1787940955&narHash=sha256-rkfKSUshRtTvlTZ8qhxqB83ljfYoZ6DKaL0tBsbsO3E%3D#go_1_27_0"
+    },
+    "github:openserbia/go-flake#golangci-lint_2_13_1": {
+      "last_modified": "2026-08-28T18:15:55Z",
+      "resolved": "github:openserbia/go-flake/cb7821f983ffb6f49f35a013052724d52dadd6da?lastModified=1787940955&narHash=sha256-rkfKSUshRtTvlTZ8qhxqB83ljfYoZ6DKaL0tBsbsO3E%3D#golangci-lint_2_13_1"
+    },
+    "github:openserbia/go-flake#govulncheck_1_7_0": {
+      "last_modified": "2026-08-28T18:15:55Z",
+      "resolved": "github:openserbia/go-flake/cb7821f983ffb6f49f35a013052724d52dadd6da?lastModified=1787940955&narHash=sha256-rkfKSUshRtTvlTZ8qhxqB83ljfYoZ6DKaL0tBsbsO3E%3D#govulncheck_1_7_0"
+    },
+    "gitleaks@latest": {
+      "last_modified": "2026-08-27T07:16:00Z",
+      "resolved": "github:NixOS/nixpkgs/c27cdad491a991b11ed731760aa2ef8db0cb0410#gitleaks",
+      "source": "devbox-search",
+      "version": "8.30.1",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/va2rvnpijbkwfnf1kf1l14b17vv7y64s-gitleaks-8.30.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/va2rvnpijbkwfnf1kf1l14b17vv7y64s-gitleaks-8.30.1"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/p2qqb151lvf86rv6k2mjw2vyrk50qpc7-gitleaks-8.30.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/p2qqb151lvf86rv6k2mjw2vyrk50qpc7-gitleaks-8.30.1"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/v5x4dkl13y4nxhcaq4xmrwkidy44gv9p-gitleaks-8.30.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/v5x4dkl13y4nxhcaq4xmrwkidy44gv9p-gitleaks-8.30.1"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/jyv71l8qlgpkh9z5q97fwb4f5bpkgc53-gitleaks-8.30.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/jyv71l8qlgpkh9z5q97fwb4f5bpkgc53-gitleaks-8.30.1"
+        }
+      }
+    },
+    "go-task@latest": {
+      "last_modified": "2026-08-27T07:16:00Z",
+      "resolved": "github:NixOS/nixpkgs/c27cdad491a991b11ed731760aa2ef8db0cb0410#go-task",
+      "source": "devbox-search",
+      "version": "3.53.1",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/2cp94m0qgih229db2yg2x30rwzrwdamk-go-task-3.53.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/2cp94m0qgih229db2yg2x30rwzrwdamk-go-task-3.53.1"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/5wxmmkjhivk4lrx09acasbyffya5q640-go-task-3.53.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/5wxmmkjhivk4lrx09acasbyffya5q640-go-task-3.53.1"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/bvzzl57kpmvzb6aj0v0yc45gvw8ggf2a-go-task-3.53.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/bvzzl57kpmvzb6aj0v0yc45gvw8ggf2a-go-task-3.53.1"
+        }
+      }
+    },
+    "gopls@latest": {
+      "last_modified": "2026-08-27T07:16:00Z",
+      "resolved": "github:NixOS/nixpkgs/c27cdad491a991b11ed731760aa2ef8db0cb0410#gopls",
+      "source": "devbox-search",
+      "version": "0.23.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/rdj83cx04c687hnqm6hmhh6yccgfsq7m-gopls-0.23.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/rdj83cx04c687hnqm6hmhh6yccgfsq7m-gopls-0.23.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/lggc2bw3dm0m738q8jbs7dpf1gcchq4d-gopls-0.23.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/lggc2bw3dm0m738q8jbs7dpf1gcchq4d-gopls-0.23.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/5k1i3qkaaxpp5kj3h4fn7csvn1a5xzg3-gopls-0.23.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/5k1i3qkaaxpp5kj3h4fn7csvn1a5xzg3-gopls-0.23.0"
+        }
+      }
+    }
+  }
+}

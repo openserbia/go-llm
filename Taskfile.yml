@@ -1,0 +1,53 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  PACKAGE_NAME:
+    sh: grep -m 1 "^module" go.mod | awk '{print $2}'
+
+tasks:
+  deps:
+    desc: Tidy modules + audit reachable CVEs (govulncheck)
+    sources:
+      - go.mod
+      - go.sum
+    cmds:
+      - go mod tidy
+      # This module has no dependencies, so there is nothing to vendor and
+      # govulncheck can only report findings in the standard library — which is
+      # exactly what a library consumed by other services needs watched.
+      - govulncheck ./...
+    method: timestamp
+
+  fmt:
+    desc: Format go code
+    cmds:
+      - golangci-lint fmt
+
+  vet:
+    desc: Report standard library symbols newer than the go directive in go.mod
+    cmds:
+      - go vet -stdversion ./...
+
+  lint:
+    desc: Run go linters
+    deps: [ fmt ]
+    cmds:
+      - task: vet
+      - golangci-lint run
+
+  test:
+    desc: Run go unit tests
+    cmds:
+      - go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+  cover:
+    desc: Show test coverage per function
+    deps: [ test ]
+    cmds:
+      - go tool cover -func=coverage.out
+
+  default:
+    cmds:
+      - task -l
