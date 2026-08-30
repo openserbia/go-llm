@@ -255,6 +255,32 @@ results, err := client.Rerank(ctx, query, documents)
 `WaitUntilReady` distinguishes "not ready yet" (503, connection refused) from
 "never going to work" (401, 404) and gives up immediately on the second kind.
 
+## Transport
+
+Every client takes an optional `HTTPClient`. Supply one and it is used exactly
+as given — your transport, your timeout, your redirect policy. Leave it nil and
+you get a client with two deliberate policies.
+
+**Redirects are not followed.** A redirect from a local inference backend is a
+misconfiguration rather than a route — a wrong port, a proxy misroute — and
+following one silently turns that into a confusing error further down. The 3xx
+is returned instead, so it surfaces as an ordinary API error carrying the body.
+It also avoids forwarding `Authorization` across a scheme or port change on the
+same host, which the standard library does not strip.
+
+**Dial failures are retried, and nothing else is.** If the connection could not
+be established, the request provably never reached the model, so a retry cannot
+re-run a completion or re-emit stream tokens. Two extra attempts, backing off
+from 100ms. Every other failure is returned unchanged — a reset partway
+through, a 5xx, a 429 — because a 5xx from `/chat/completions` usually means
+the model already did the work. Retrying that has a real cost, so it stays your
+decision.
+
+There is no client-level timeout. Per-request deadlines come from
+`Options.Timeout` via the context, which is what lets `ChatStream` stay
+unbounded while `Chat` does not — a transport deadline would sever a long
+stream mid-response.
+
 ## Configuration
 
 The library reads no environment variables and parses no config files.
