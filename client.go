@@ -3,7 +3,7 @@ package llm
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -107,9 +107,9 @@ type wireRequest struct {
 	Model          string          `json:"model"`
 	Messages       []Message       `json:"messages"`
 	Temperature    float64         `json:"temperature"`
-	MaxTokens      int             `json:"max_tokens,omitempty"`
-	Stream         bool            `json:"stream,omitempty"`
-	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
+	MaxTokens      int             `json:"max_tokens,omitzero"`
+	Stream         bool            `json:"stream,omitzero"`
+	ResponseFormat *ResponseFormat `json:"response_format,omitzero"`
 }
 
 type wireResponse struct {
@@ -197,7 +197,7 @@ func (c *HTTPClient) do(ctx context.Context, body wireRequest) (ChatResponse, er
 	}
 
 	var out wireResponse
-	if err := json.NewDecoder(httpResp.Body).Decode(&out); err != nil {
+	if err := json.UnmarshalRead(httpResp.Body, &out); err != nil {
 		return ChatResponse{}, fmt.Errorf("llm: chat: decode response: %w", err)
 	}
 	// Some backends answer 200 with an error envelope instead of a status code.

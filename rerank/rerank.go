@@ -20,7 +20,7 @@ package rerank
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -167,7 +167,7 @@ func (c *HTTPClient) Rerank(ctx context.Context, query string, documents []strin
 	}
 
 	var out []Result
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("rerank: decode response: %w", err)
 	}
 	return out, nil

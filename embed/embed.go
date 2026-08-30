@@ -4,7 +4,7 @@ package embed
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -150,7 +150,7 @@ func (c *HTTPClient) Embed(ctx context.Context, inputs []string) ([][]float32, e
 	}
 
 	var out wireResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("embed: decode response: %w", err)
 	}
 	if len(out.Data) != len(inputs) {

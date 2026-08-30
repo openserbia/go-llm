@@ -14,7 +14,7 @@ package lmstudio
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -195,7 +195,7 @@ func (c *Client) Models(ctx context.Context) ([]Model, error) {
 	}
 
 	var out modelsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("lmstudio: decode models: %w", err)
 	}
 	return out.Models, nil

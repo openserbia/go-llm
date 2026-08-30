@@ -2,8 +2,9 @@ package llm_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,20 +13,27 @@ import (
 	"github.com/openserbia/go-llm"
 )
 
-// capture records the response_format of every request a server receives, so a
-// test can assert on the fallback sequence rather than just the final answer.
+// capture records what every request carried, so a test can assert on the
+// fallback sequence and on the exact wire body rather than just the answer.
 type capture struct {
 	formats []*llm.ResponseFormat
+	bodies  [][]byte
 	auth    string
 }
 
 func newServer(t *testing.T, rec *capture, handle func(attempt int, w http.ResponseWriter)) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read request body: %v", err)
+		}
+		rec.bodies = append(rec.bodies, raw)
+
 		var body struct {
 			ResponseFormat *llm.ResponseFormat `json:"response_format"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if err := json.Unmarshal(raw, &body); err != nil {
 			t.Errorf("decode request: %v", err)
 		}
 		rec.formats = append(rec.formats, body.ResponseFormat)
@@ -72,6 +80,29 @@ func TestChatReturnsContentAndUsage(t *testing.T) {
 	}
 	if rec.auth != "Bearer secret" {
 		t.Errorf("Authorization = %q, want %q", rec.auth, "Bearer secret")
+	}
+}
+
+func TestChatOmitsMaxTokensWhenZero(t *testing.T) {
+	rec := &capture{}
+	srv := newServer(t, rec, func(_ int, w http.ResponseWriter) { okResponse(w, "hi") })
+
+	if _, err := newClient(t, srv.URL).Chat(context.Background(), llm.ChatRequest{
+		Messages: []llm.Message{llm.User("hi")},
+	}); err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	var sent map[string]any
+	if err := json.Unmarshal(rec.bodies[0], &sent); err != nil {
+		t.Fatalf("decode sent body: %v", err)
+	}
+	// A zero MaxTokens means "let the backend decide", not "produce nothing".
+	if _, ok := sent["max_tokens"]; ok {
+		t.Errorf("request sent max_tokens = %v, want the key absent", sent["max_tokens"])
+	}
+	if _, ok := sent["stream"]; ok {
+		t.Errorf("request sent stream = %v, want the key absent", sent["stream"])
 	}
 }
 
@@ -226,7 +257,7 @@ func TestCompleteSendsSystemAndUser(t *testing.T) {
 		var body struct {
 			Messages []llm.Message `json:"messages"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		_ = json.UnmarshalRead(r.Body, &body)
 		for _, m := range body.Messages {
 			roles = append(roles, m.Role)
 		}
