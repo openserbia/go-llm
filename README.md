@@ -9,7 +9,9 @@ library detects those gaps — from the backend's error responses, and from the
 bytes a request actually returns — and degrades instead of failing, so the
 calling code does not have to know which backend it is pointed at.
 
-Zero dependencies outside the standard library.
+Zero dependencies outside the standard library. Requires Go 1.27 — the library
+uses `encoding/json/v2`, which decodes into a typed result strictly enough to
+catch a model inventing a field.
 
 ```bash
 go get github.com/openserbia/go-llm
@@ -127,13 +129,31 @@ for chunk := range ch {
     if chunk.Err != nil {
         return chunk.Err
     }
+    if chunk.Done {
+        log.Printf("%s, %d tokens", chunk.FinishReason, chunk.Usage.TotalTokens)
+        break
+    }
     fmt.Print(chunk.Delta)
 }
 ```
 
+The terminal chunk carries `FinishReason` and `Usage`, so a streaming caller
+can tell a model that finished from one that hit `MaxTokens` — `"length"` means
+the output is cut, which matters most when you asked for JSON, since a truncated
+document never parses. Getting the token count requires asking for it, so
+`ChatStream` sets `stream_options.include_usage`; backends that ignore the field
+simply report zero.
+
+That usage event arrives *after* the `finish_reason` event, so the reader keeps
+scanning past it rather than stopping. Content deltas arriving after a
+`finish_reason` are dropped: the completion is over at that point, and appending
+to text the caller has already been told is finished would be worse than losing
+it.
+
 A backend that rejects `stream: true` transparently falls back to one
-non-streaming request delivered as a single chunk. `ChatStream` applies no
-timeout of its own — bound it with `ctx`.
+non-streaming request, whose whole response arrives as a single delta followed
+by the usual terminal chunk. `ChatStream` applies no timeout of its own — bound
+it with `ctx`.
 
 ## Context overflow
 
