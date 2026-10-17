@@ -1,13 +1,13 @@
 # Unified openserbia golangci-lint config.
 #
-# Source of truth: openserbia/go-template/.golangci.yml, with two changes for
-# this module: it has no dependencies, so there is nothing to vendor and
-# modules-download-mode is `mod`; and `revive: exported` is enabled, because
-# this is a public API where an undocumented exported symbol is a defect.
+# Source of truth: openserbia/go-template/.golangci.yml.
+# Copy verbatim into every service module; append a SERVICE OVERRIDES block
+# at the bottom for paths/rules unique to that service.
 
 version: "2"
 
 run:
+  # SERVICE OVERRIDE (go-llm) ─────
   modules-download-mode: mod
   timeout: 5m
 
@@ -23,26 +23,37 @@ linters:
     - sqlclosecheck
 
     # Bug prevention
+    - asasalint
     - durationcheck
+    - errchkjson
     - errorlint
     - exhaustive
     - fatcontext
     - gocheckcompilerdirectives
+    - gochecksumtype
+    - iotamixing
     - makezero
+    - musttag
     - nilerr
+    - nilnesserr
     - nosprintfhostport
     - predeclared
+    - reassign
     - rowserrcheck
 
     # Code quality
     - copyloopvar
     - dupl
     - errname
+    - exptostd
+    - ginkgolinter
     - goconst
     - gocritic
     - intrange
+    - mirror
     - misspell
     - mnd
+    - modernize
     - perfsprint
     - prealloc
     - recvcheck
@@ -50,6 +61,7 @@ linters:
     - unconvert
     - unparam
     - usestdlibvars
+    - usetesting
     - wastedassign
     - whitespace
 
@@ -85,8 +97,8 @@ linters:
 
     gosec:
       excludes:
-        - G104 # unhandled errors — covered by errcheck with better signal
-        - G117 # int overflow on conversion — high FP rate on int→int32
+        - G104 # unhandled errors: covered by errcheck with better signal
+        - G117 # int overflow on conversion: high FP rate on int to int32
 
     mnd:
       ignored-functions:
@@ -110,7 +122,7 @@ linters:
         - name: error-return
         - name: error-strings
         - name: errorf
-        # A public library: every exported symbol carries a doc comment.
+        # SERVICE OVERRIDE (go-llm) ─────
         - name: exported
         - name: increment-decrement
         - name: indent-error-flow
@@ -173,10 +185,16 @@ issues:
   max-same-issues: 5
 
 # ─────────────────────────────────────────────────────────────────────────
-# SERVICE OVERRIDES — inline service-specific exclusions ABOVE, as additional
+# SERVICE OVERRIDES: inline service-specific exclusions ABOVE, as additional
 # entries inside linters.exclusions.paths: and linters.exclusions.rules:.
-# Do NOT add a second top-level `linters:` block — YAML rejects duplicate
+# Do NOT add a second top-level `linters:` block. YAML rejects duplicate
 # keys and golangci-lint will refuse to load the config.
 # Mark inlined overrides with `# SERVICE OVERRIDE (<svc>) ─────` so they
 # remain distinguishable from the shared baseline.
 # ─────────────────────────────────────────────────────────────────────────
+#
+# SERVICE OVERRIDE (go-llm) ─────
+# - run.modules-download-mode: mod. The module has no dependencies, so there
+#   is no vendor/ directory to read from.
+# - revive `exported` is enabled. This is a published library; an exported
+#   symbol without a doc comment is a defect in its public API.
