@@ -71,8 +71,7 @@ func TestHealthCheck503IsRetryable(t *testing.T) {
 	}
 	_, err = client.HealthCheck(context.Background())
 
-	var retryable rerank.RetryableError
-	if !errors.As(err, &retryable) {
+	if _, ok := errors.AsType[rerank.RetryableError](err); !ok {
 		t.Fatalf("err = %v, want rerank.RetryableError", err)
 	}
 }
@@ -89,8 +88,7 @@ func TestHealthCheck404IsNotRetryable(t *testing.T) {
 	}
 	_, err = client.HealthCheck(context.Background())
 
-	var retryable rerank.RetryableError
-	if errors.As(err, &retryable) {
+	if _, ok := errors.AsType[rerank.RetryableError](err); ok {
 		t.Error("404 classified as retryable; a wrong URL never becomes right by waiting")
 	}
 	if err == nil {

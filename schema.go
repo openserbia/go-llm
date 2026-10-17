@@ -123,9 +123,7 @@ func structSchema(t reflect.Type, seen map[reflect.Type]bool) (map[string]any, e
 // embedded structs the way encoding/json does so the schema matches what the
 // decoder will actually accept.
 func collectFields(t reflect.Type, seen map[reflect.Type]bool, properties map[string]any, required *[]string) error {
-	for i := range t.NumField() {
-		field := t.Field(i)
-
+	for field := range t.Fields() {
 		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
 		if name == "-" {
 			continue

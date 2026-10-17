@@ -152,8 +152,8 @@ func rewind(req *http.Request) error {
 // isDialFailure reports whether err is the connection never being established,
 // as opposed to a failure partway through an exchange.
 func isDialFailure(err error) bool {
-	var opErr *net.OpError
-	return errors.As(err, &opErr) && opErr.Op == "dial"
+	opErr, ok := errors.AsType[*net.OpError](err)
+	return ok && opErr.Op == "dial"
 }
 
 // Backoff returns the wait before the given zero-based attempt, doubling from

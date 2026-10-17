@@ -23,8 +23,7 @@ func (e *APIError) Error() string {
 
 // Status reports the HTTP status of err if it is an APIError, else 0.
 func Status(err error) int {
-	var apiErr *APIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*APIError](err); ok {
 		return apiErr.Status
 	}
 	return 0
@@ -140,6 +139,9 @@ func (e *TruncatedError) Error() string {
 // response does not, because a weaker constraint does not buy back a token
 // budget.
 func shouldDegrade(err error) bool {
-	var ignored *FormatIgnoredError
-	return IsUnsupportedResponseFormat(err) || errors.As(err, &ignored)
+	if IsUnsupportedResponseFormat(err) {
+		return true
+	}
+	_, ignored := errors.AsType[*FormatIgnoredError](err)
+	return ignored
 }

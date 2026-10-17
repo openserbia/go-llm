@@ -75,8 +75,8 @@ func TestEmbedDimensionMismatch(t *testing.T) {
 	}
 	_, err = client.Embed(context.Background(), []string{"a"})
 
-	var mismatch *embed.DimensionMismatchError
-	if !errors.As(err, &mismatch) {
+	mismatch, ok := errors.AsType[*embed.DimensionMismatchError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *embed.DimensionMismatchError", err)
 	}
 	if mismatch.Got != 3 || mismatch.Want != 1024 {

@@ -181,7 +181,7 @@ func TestEnsureLoadedReturnsLoadedModel(t *testing.T) {
 	srv := modelsServer(t)
 
 	model, err := lmstudio.EnsureLoaded(context.Background(), lmstudio.PreflightOptions{
-		Options: lmstudio.Options{BaseURL: srv.URL + "/v1"},
+		BaseURL: srv.URL + "/v1",
 		Model:   "gemma-3-12b-it",
 		Logger:  discardLogger(),
 	})
@@ -199,7 +199,7 @@ func TestEnsureLoadedRefusesUnloadedWithoutStrategy(t *testing.T) {
 	// Neither UseCLI nor WarmUp: claiming VRAM is not something a preflight
 	// should do behind the caller's back.
 	_, err := lmstudio.EnsureLoaded(context.Background(), lmstudio.PreflightOptions{
-		Options: lmstudio.Options{BaseURL: srv.URL},
+		BaseURL: srv.URL,
 		Model:   "qwen3-4b",
 		Logger:  discardLogger(),
 	})
@@ -228,7 +228,7 @@ func TestEnsureLoadedWarmUpLoadsModel(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	model, err := lmstudio.EnsureLoaded(context.Background(), lmstudio.PreflightOptions{
-		Options: lmstudio.Options{BaseURL: srv.URL + "/v1"},
+		BaseURL: srv.URL + "/v1",
 		Model:   "qwen3-4b",
 		WarmUp:  true,
 		Logger:  discardLogger(),
@@ -246,7 +246,7 @@ func TestEnsureLoadedWarmUpLoadsModel(t *testing.T) {
 
 func TestEnsureLoadedRequiresModel(t *testing.T) {
 	_, err := lmstudio.EnsureLoaded(context.Background(), lmstudio.PreflightOptions{
-		Options: lmstudio.Options{BaseURL: "http://127.0.0.1:1"},
+		BaseURL: "http://127.0.0.1:1",
 	})
 	if err == nil {
 		t.Fatal("EnsureLoaded succeeded without a model, want error")
@@ -282,7 +282,7 @@ func TestEnsureLoadedWarmsUpEmbeddingModelViaEmbeddings(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	model, err := lmstudio.EnsureLoaded(context.Background(), lmstudio.PreflightOptions{
-		Options: lmstudio.Options{BaseURL: srv.URL + "/v1"},
+		BaseURL: srv.URL + "/v1",
 		Model:   "bge-m3",
 		WarmUp:  true,
 		Logger:  discardLogger(),

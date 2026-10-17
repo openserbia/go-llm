@@ -219,8 +219,7 @@ func WaitUntilReady(ctx context.Context, c Client, logger *slog.Logger) (*Health
 			return info, nil
 		}
 
-		var retryable RetryableError
-		if !errors.As(err, &retryable) {
+		if _, ok := errors.AsType[RetryableError](err); !ok {
 			return nil, err
 		}
 

@@ -189,8 +189,8 @@ func TestChatServerErrorIsNotRetried(t *testing.T) {
 		t.Errorf("attempts = %d, want 1", len(rec.formats))
 	}
 
-	var apiErr *llm.APIError
-	if !errors.As(err, &apiErr) {
+	apiErr, ok := errors.AsType[*llm.APIError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *llm.APIError", err)
 	}
 	if apiErr.Status != http.StatusInternalServerError {
@@ -317,8 +317,8 @@ func TestChatRequiredSurfacesIgnoredFormat(t *testing.T) {
 	if err == nil {
 		t.Fatal("Chat succeeded, want error")
 	}
-	var ignored *llm.FormatIgnoredError
-	if !errors.As(err, &ignored) {
+	ignored, ok := errors.AsType[*llm.FormatIgnoredError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *llm.FormatIgnoredError", err)
 	}
 	if ignored.Format != llm.FormatJSONSchema {
@@ -344,8 +344,7 @@ func TestChatTruncatedStructuredResponseDoesNotDegrade(t *testing.T) {
 	if err == nil {
 		t.Fatal("Chat succeeded, want error")
 	}
-	var truncated *llm.TruncatedError
-	if !errors.As(err, &truncated) {
+	if _, ok := errors.AsType[*llm.TruncatedError](err); !ok {
 		t.Fatalf("err = %v, want *llm.TruncatedError", err)
 	}
 	// A smaller constraint does not buy back a token budget, so degrading

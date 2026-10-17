@@ -145,8 +145,8 @@ func New(opts Options) (*Client, error) {
 func ServerRoot(baseURL string) string {
 	root := strings.TrimRight(baseURL, "/")
 	for _, suffix := range []string{"/api/v1", "/v1"} {
-		if strings.HasSuffix(root, suffix) {
-			return strings.TrimSuffix(root, suffix)
+		if trimmed, ok := strings.CutSuffix(root, suffix); ok {
+			return trimmed
 		}
 	}
 	return root
