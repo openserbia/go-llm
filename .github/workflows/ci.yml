@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,6 +24,9 @@ jobs:
 
       - name: Install Devbox
         uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7  # v0.15.0
+
+        with:
+          enable-cache: true
 
       # `task lint` also runs `go vet -stdversion`, which fails when the code
       # uses standard library symbols newer than go.mod's go directive.
